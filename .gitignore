@@ -1,0 +1,42 @@
+# ==========================================
+# GLOBAUX & EDITEURS
+# ==========================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# FRONTEND (IFRI_MentorLink_Front)
+# ==========================================
+**/node_modules/
+**/dist/
+**/build/
+**/.local_chromium/
+
+# ==========================================
+# BACKEND (IFRI_MentorLink-backend)
+# ==========================================
+**/venv/
+**/env/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache/
+
+# ==========================================
+# CONFIGURATIONS & SECRETS (Sécurité)
+# ==========================================
+*.env
+*.env.local
+*.env.*.local
+.env
+.env.backend
+.env.front

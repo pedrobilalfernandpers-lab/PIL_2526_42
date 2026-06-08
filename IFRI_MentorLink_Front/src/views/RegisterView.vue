@@ -73,6 +73,8 @@ const handleRegister = async () => {
               <option value="Génie Logiciel">Génie Logiciel</option>
               <option value="Sécurité Informatique">Sécurité Informatique</option>
               <option value="Intelligence Artificielle">Intelligence Artificielle</option>
+              <option value="Système Embarqué et Internet des Objets">Système Embarqué et Internet des Objets</option>
+              <option value="Internet et Multimédia">Internet et Multimédia</option>
             </select>
           </div>
           <div>

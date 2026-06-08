@@ -1,6 +1,6 @@
 # services/auth_service.py
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -13,8 +13,7 @@ from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from database import get_db
 from models.user import User
 
-# Contexte bcrypt pour le hachage des mots de passe
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 # Indique à FastAPI où chercher le token dans les requêtes
 # Il cherchera un header : Authorization: Bearer <token>
@@ -25,12 +24,21 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 def hash_password(password: str) -> str:
     """Transforme un mot de passe en clair en hash bcrypt"""
-    return pwd_context.hash(password)
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(pwd_bytes, salt)
+    return hashed.decode('utf-8')
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Vérifie qu'un mot de passe correspond à son hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return bcrypt.checkpw(
+            plain_password.encode('utf-8'), 
+            hashed_password.encode('utf-8')
+        )
+    except Exception:
+        return False
 
 
 # ── TOKENS JWT ───────────────────────────────────────────────
@@ -40,12 +48,12 @@ def create_access_token(user_id: int) -> str:
     Crée un token JWT signé contenant l'id de l'utilisateur.
     Le token expire après ACCESS_TOKEN_EXPIRE_MINUTES minutes.
     """
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {
         "sub": str(user_id),   # "sub" = subject = identifiant principal
         "exp": expire          # date d'expiration
     }
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return jwt.encode(payload, SECRET_KEY or "", algorithm=ALGORITHM or "HS256")
 
 
 def decode_token(token: str) -> Optional[int]:
@@ -54,7 +62,7 @@ def decode_token(token: str) -> Optional[int]:
     Retourne None si le token est invalide ou expiré.
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, SECRET_KEY or "", algorithms=[ALGORITHM or "HS256"])
         user_id = payload.get("sub")
         if user_id is None:
             return None

@@ -9,7 +9,7 @@ from config import DATABASE_URL, SUPABASE_URL, SUPABASE_KEY
 # ── Client Supabase ───────────────────────────────────────────
 # Utilisé pour le Realtime (notifications chat temps réel)
 # Ce client parle à Supabase via son API REST
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client = create_client(SUPABASE_URL or "", SUPABASE_KEY or "")
 
 # ── SQLAlchemy (connexion PostgreSQL directe) ─────────────────
 # Utilisé par tous les routers pour les opérations CRUD

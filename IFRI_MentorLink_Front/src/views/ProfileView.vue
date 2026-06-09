@@ -57,6 +57,50 @@ const updateProfile = async () => {
   }
 }
 
+const handleFileUpload = (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  
+  if (!file.type.startsWith('image/')) {
+    alert("Veuillez sélectionner une image.")
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = (event) => {
+    const img = new Image()
+    img.onload = () => {
+      // Redimensionnement à 300x300 max pour éviter d'exploser la DB
+      const canvas = document.createElement('canvas')
+      const MAX_SIZE = 300
+      let width = img.width
+      let height = img.height
+
+      if (width > height) {
+        if (width > MAX_SIZE) {
+          height *= MAX_SIZE / width
+          width = MAX_SIZE
+        }
+      } else {
+        if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height
+          height = MAX_SIZE
+        }
+      }
+
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+      
+      // Conversion en base64 (qualité 0.8)
+      editData.value.profile_photo = canvas.toDataURL('image/jpeg', 0.8)
+    }
+    img.src = event.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
 const addSkill = async () => {
   if (!newSkill.value.skill_id) return
   try {
@@ -87,32 +131,56 @@ onMounted(fetchData)
           <button v-if="!editMode" @click="editMode = true" class="text-brand text-sm font-medium hover:underline">Modifier</button>
         </div>
         
-        <form v-if="editMode" @submit.prevent="updateProfile" class="space-y-4">
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm text-gray-500 mb-1">Prénom</label>
-              <input v-model="editData.first_name" required class="w-full px-4 py-2 bg-gray-50 rounded-xl" />
+        <div class="flex flex-col sm:flex-row gap-8 items-start">
+          
+          <!-- Photo de profil -->
+          <div class="flex-shrink-0 flex flex-col items-center gap-3">
+            <div class="w-32 h-32 rounded-full bg-gray-100 overflow-hidden border-4 border-white shadow-lg flex items-center justify-center relative">
+              <img v-if="editMode && editData.profile_photo" :src="editData.profile_photo" class="w-full h-full object-cover" />
+              <img v-else-if="!editMode && user.profile_photo" :src="user.profile_photo" class="w-full h-full object-cover" />
+              <span v-else class="text-4xl font-bold text-gray-300">
+                {{ user.first_name.charAt(0) }}{{ user.last_name.charAt(0) }}
+              </span>
+              
+              <!-- Overlay Edit -->
+              <label v-if="editMode" class="absolute inset-0 bg-black/40 flex items-center justify-center cursor-pointer opacity-0 hover:opacity-100 transition-opacity">
+                <span class="text-white text-xs font-bold">Changer</span>
+                <input type="file" accept="image/*" class="hidden" @change="handleFileUpload" />
+              </label>
             </div>
-            <div>
-              <label class="block text-sm text-gray-500 mb-1">Nom</label>
-              <input v-model="editData.last_name" required class="w-full px-4 py-2 bg-gray-50 rounded-xl" />
-            </div>
+            <p v-if="editMode" class="text-xs text-gray-400 text-center">Format carré<br>Max 1 Mo</p>
           </div>
-          <div>
-            <label class="block text-sm text-gray-500 mb-1">Filière</label>
-            <input v-model="editData.field_of_study" required class="w-full px-4 py-2 bg-gray-50 rounded-xl" />
-          </div>
-          <div class="flex gap-3 pt-2">
-            <button type="button" @click="editMode = false" class="px-6 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">Annuler</button>
-            <button type="submit" class="px-6 py-2 bg-brand text-white rounded-xl hover:bg-brand-dark">Enregistrer</button>
-          </div>
-        </form>
 
-        <div v-else class="grid grid-cols-2 gap-4 text-gray-700">
-          <div><span class="text-gray-400 text-sm block">Prénom</span> {{ user.first_name }}</div>
-          <div><span class="text-gray-400 text-sm block">Nom</span> {{ user.last_name }}</div>
-          <div><span class="text-gray-400 text-sm block">Email</span> {{ user.email }}</div>
-          <div><span class="text-gray-400 text-sm block">Filière</span> {{ user.field_of_study }}</div>
+          <!-- Formulaire / Infos -->
+          <div class="flex-grow w-full">
+            <form v-if="editMode" @submit.prevent="updateProfile" class="space-y-4">
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm text-gray-500 mb-1">Prénom</label>
+                  <input v-model="editData.first_name" required class="w-full px-4 py-2 bg-gray-50 rounded-xl" />
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-500 mb-1">Nom</label>
+                  <input v-model="editData.last_name" required class="w-full px-4 py-2 bg-gray-50 rounded-xl" />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm text-gray-500 mb-1">Filière</label>
+                <input v-model="editData.field_of_study" required class="w-full px-4 py-2 bg-gray-50 rounded-xl" />
+              </div>
+              <div class="flex gap-3 pt-2">
+                <button type="button" @click="editMode = false" class="px-6 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">Annuler</button>
+                <button type="submit" class="px-6 py-2 bg-brand text-white rounded-xl hover:bg-brand-dark">Enregistrer</button>
+              </div>
+            </form>
+
+            <div v-else class="grid grid-cols-2 gap-6 text-gray-700 mt-2">
+              <div><span class="text-gray-400 text-sm block mb-1">Prénom</span> <span class="font-medium text-gray-900">{{ user.first_name }}</span></div>
+              <div><span class="text-gray-400 text-sm block mb-1">Nom</span> <span class="font-medium text-gray-900">{{ user.last_name }}</span></div>
+              <div><span class="text-gray-400 text-sm block mb-1">Email</span> <span class="font-medium text-gray-900">{{ user.email }}</span></div>
+              <div><span class="text-gray-400 text-sm block mb-1">Filière</span> <span class="font-medium text-gray-900">{{ user.field_of_study }}</span></div>
+            </div>
+          </div>
         </div>
       </div>
 

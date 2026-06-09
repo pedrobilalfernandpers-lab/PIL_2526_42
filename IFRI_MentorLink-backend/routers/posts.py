@@ -31,11 +31,13 @@ def get_posts(
 
     posts = query.order_by(MentorshipPost.created_at.desc()).all()
 
-    # Enrichir chaque post avec le nom de la compétence
+    # Enrichir chaque post avec le nom de la compétence et les infos de l'auteur
     result = []
     for post in posts:
         skill = db.query(Skill).filter(Skill.id == post.skill_id).first()
         setattr(post, "skill_name", skill.name if skill else "")
+        setattr(post, "user_name", f"{post.user.first_name} {post.user.last_name}")
+        setattr(post, "user_photo", post.user.profile_photo)
         result.append(PostResponse.model_validate(post))
     return result
 

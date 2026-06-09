@@ -7,6 +7,8 @@ const skills = ref([])
 const loading = ref(true)
 
 const showModal = ref(false)
+const showProfileModal = ref(false)
+const selectedUserProfile = ref(null)
 
 const filterType = ref('')
 const filterSkill = ref('')
@@ -109,6 +111,19 @@ const applyToPost = async (postId) => {
   }
 }
 
+const viewUserProfile = async (userId) => {
+  try {
+    const res = await axios.get(`/api/users/${userId}`, {
+      headers: { Authorization: `Bearer ${getToken()}` }
+    })
+    selectedUserProfile.value = res.data
+    showProfileModal.value = true
+  } catch (err) {
+    console.error(err)
+    alert("Impossible de charger le profil de cet utilisateur.")
+  }
+}
+
 onMounted(fetchData)
 </script>
 
@@ -162,7 +177,18 @@ onMounted(fetchData)
           </div>
         </div>
 
-        <div class="flex justify-between items-center mt-auto">
+        <!-- Auteur -->
+        <div class="flex items-center gap-3 mt-4 pt-4 border-t border-gray-100 cursor-pointer group" @click="viewUserProfile(post.user_id)">
+          <div class="w-8 h-8 rounded-full bg-brand-light flex items-center justify-center overflow-hidden flex-shrink-0 border border-brand/20 group-hover:ring-2 ring-brand ring-offset-1 transition-all">
+            <img v-if="post.user_photo" :src="post.user_photo" class="w-full h-full object-cover" />
+            <span v-else class="text-xs font-bold text-brand">{{ post.user_name.substring(0,2).toUpperCase() }}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-semibold text-gray-900 truncate group-hover:text-brand transition-colors">{{ post.user_name }}</div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center mt-4">
           <div class="text-sm text-gray-500 bg-gray-50 px-3 py-2 rounded-xl">
             📍 {{ post.mode === 'online' ? 'En ligne' : (post.mode === 'offline' ? 'Présentiel' : 'Les deux') }}
           </div>
@@ -239,12 +265,45 @@ onMounted(fetchData)
               Aucun créneau spécifié.
             </div>
           </div>
-
-          <div class="flex gap-3 pt-4">
-            <button type="button" @click="showModal = false" class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-medium hover:bg-gray-200 transition">Annuler</button>
-            <button type="submit" class="flex-1 bg-brand text-white py-3 rounded-xl font-medium hover:bg-brand-dark transition shadow-sm">Publier</button>
+          <div class="flex justify-end gap-3 mt-8">
+            <button type="button" @click="showModal = false" class="px-6 py-2.5 bg-gray-100 text-gray-600 rounded-xl font-medium hover:bg-gray-200">Annuler</button>
+            <button type="submit" class="px-6 py-2.5 bg-brand text-white rounded-xl font-medium hover:bg-brand-dark">Publier</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Modal Profil Utilisateur -->
+    <div v-if="showProfileModal && selectedUserProfile" class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl relative">
+        <button @click="showProfileModal = false" class="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200">
+          ✕
+        </button>
+        
+        <div class="p-8 text-center border-b border-gray-100">
+          <div class="w-24 h-24 rounded-full bg-brand-light mx-auto mb-4 overflow-hidden border-4 border-white shadow-lg flex items-center justify-center">
+            <img v-if="selectedUserProfile.profile_photo" :src="selectedUserProfile.profile_photo" class="w-full h-full object-cover" />
+            <span v-else class="text-2xl font-bold text-brand">
+              {{ selectedUserProfile.first_name.charAt(0) }}{{ selectedUserProfile.last_name.charAt(0) }}
+            </span>
+          </div>
+          <h2 class="text-2xl font-bold text-gray-900">{{ selectedUserProfile.first_name }} {{ selectedUserProfile.last_name }}</h2>
+          <p class="text-gray-500 font-medium mt-1">{{ selectedUserProfile.field_of_study }}</p>
+        </div>
+        
+        <div class="p-8 bg-gray-50/50">
+          <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Compétences</h3>
+          <div class="flex flex-wrap gap-2">
+            <span v-for="s in selectedUserProfile.skills" :key="s.skill_id" 
+                  class="px-3 py-1.5 rounded-lg text-xs font-medium border"
+                  :class="s.proficiency === 'strong' ? 'bg-green-50 text-green-700 border-green-200' : (s.proficiency === 'weak' ? 'bg-orange-50 text-orange-700 border-orange-200' : 'bg-blue-50 text-blue-700 border-blue-200')">
+              {{ s.skill_name }}
+            </span>
+            <span v-if="!selectedUserProfile.skills || selectedUserProfile.skills.length === 0" class="text-sm text-gray-500 italic">
+              Aucune compétence renseignée.
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   </div>

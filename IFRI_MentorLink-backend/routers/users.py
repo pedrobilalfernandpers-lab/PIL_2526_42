@@ -23,6 +23,19 @@ def get_my_profile(
     return current_user
 
 
+@router.get("/{user_id}", response_model=UserProfileResponse)
+def get_user_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Retourne le profil complet d'un autre utilisateur"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé.")
+    return user
+
+
 @router.put("/me", response_model=UserProfileResponse)
 def update_my_profile(
     payload: UpdateProfileRequest,
@@ -55,7 +68,7 @@ def add_skill(
 
     if existing:
         # Met à jour le niveau si la compétence existe déjà
-        existing.proficiency = payload.proficiency
+        setattr(existing, "proficiency", payload.proficiency)
         db.commit()
         return {"message": "Compétence mise à jour."}
 

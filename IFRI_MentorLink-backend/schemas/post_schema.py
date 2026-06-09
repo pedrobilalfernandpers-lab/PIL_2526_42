@@ -40,6 +40,8 @@ class PostResponse(BaseModel):
     """Un post tel que retourné par l'API"""
     id:            int
     user_id:       int
+    user_name:     str
+    user_photo:    Optional[str] = None
     type:          str
     skill_id:      int
     skill_name:    str   # nom de la compétence (depuis la jointure avec skills)

@@ -1,6 +1,7 @@
 ﻿<script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import axios from 'axios'
+import { wsNotifications } from '../services/wsService'
 
 const conversations = ref([])
 const messages = ref([])
@@ -54,7 +55,38 @@ const rejectMatch = async (matchId) => {
   }
 }
 
-onMounted(fetchConversations)
+// Écouter les nouveaux messages reçus globalement
+watch(wsNotifications, (newVal) => {
+  if (newVal.length > 0) {
+    const data = newVal[newVal.length - 1]
+    const msgConvId = data.conversation_id
+    
+    // Si c'est la conversation active, on ajoute le message directement
+    if (activeConvId.value === msgConvId) {
+      messages.value.push(data)
+    }
+    
+    // On met à jour la sidebar (dernier message et compteur non lu)
+    const convIndex = conversations.value.findIndex(c => c.id === msgConvId)
+    if (convIndex !== -1) {
+      conversations.value[convIndex].last_message = data.content
+      conversations.value[convIndex].last_message_time = data.created_at
+      if (activeConvId.value !== msgConvId) {
+        conversations.value[convIndex].unread_count = (conversations.value[convIndex].unread_count || 0) + 1
+      }
+      // Remonter la conversation en haut
+      const updatedConv = conversations.value.splice(convIndex, 1)[0]
+      conversations.value.unshift(updatedConv)
+    } else {
+      // Si c'est une toute nouvelle conversation, on rafraîchit la liste
+      fetchConversations()
+    }
+  }
+}, { deep: true })
+
+onMounted(() => {
+  fetchConversations()
+})
 </script>
 
 <template>

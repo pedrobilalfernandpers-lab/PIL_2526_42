@@ -1,8 +1,9 @@
 # routers/chat.py
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, BackgroundTasks
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict
+import json
 
 from database import get_db
 from models.conversation import Conversation
@@ -10,10 +11,51 @@ from models.match import Match
 from models.message import Message
 from models.user import User
 from schemas.message_schema import SendMessageRequest
-from services.auth_service import get_current_user
+from services.auth_service import get_current_user, decode_token
 from services.chat_service import get_conversation_or_403
 
 router = APIRouter()
+
+# ── WEBSOCKET MANAGER ────────────────────────────────────────
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[int, WebSocket] = {}
+
+    async def connect(self, websocket: WebSocket, user_id: int):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+
+    def disconnect(self, user_id: int):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+
+    async def send_personal_message(self, message: str, user_id: int):
+        if user_id in self.active_connections:
+            try:
+                await self.active_connections[user_id].send_text(message)
+            except Exception as e:
+                print(f"Erreur WebSocket pour user {user_id}: {e}")
+
+manager = ConnectionManager()
+
+@router.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(...)):
+    user_id = decode_token(token)
+    if not user_id:
+        await websocket.close(code=1008)
+        return
+        
+    await manager.connect(websocket, user_id)
+    try:
+        while True:
+            # Maintenir la connexion ouverte
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(user_id)
+
+async def notify_user(user_id: int, message_payload: dict):
+    await manager.send_personal_message(json.dumps(message_payload), user_id)
 
 
 @router.get("/conversations")
@@ -40,6 +82,9 @@ def get_my_conversations(
         # Identifier l'autre utilisateur dans la conversation
         other_id   = match.mentee_id if match.mentor_id == current_user.id else match.mentor_id
         other_user = db.query(User).filter(User.id == other_id).first()
+        
+        if not other_user:
+            continue
 
         # Dernier message
         last_msg = db.query(Message).filter(
@@ -102,6 +147,7 @@ def get_messages(
 def send_message(
     conv_id: int,
     payload: SendMessageRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -121,6 +167,28 @@ def send_message(
 
     db.commit()
     db.refresh(new_message)
+
+    # Déterminer le destinataire
+    other_id = conv.match.mentee_id if conv.match.mentor_id == current_user.id else conv.match.mentor_id
+
+    # Notifier le destinataire en temps réel
+    background_tasks.add_task(
+        notify_user,
+        other_id,
+        {
+            "type": "new_message",
+            "conversation_id": conv.id,
+            "message": {
+                "id": new_message.id,
+                "sender_id": current_user.id,
+                "sender_name": f"{current_user.first_name} {current_user.last_name}",
+                "content": new_message.content,
+                "is_read": False,
+                "created_at": new_message.created_at.isoformat()
+            }
+        }
+    )
+
     return {"message": "Message envoyé.", "id": new_message.id}
 
 
@@ -137,6 +205,6 @@ def mark_as_read(
         # On ne marque pas ses propres messages comme lus
         return {"message": "Rien à faire."}
 
-    message.is_read = True
+    setattr(message, "is_read", True)
     db.commit()
     return {"message": "Message marqué comme lu."}
